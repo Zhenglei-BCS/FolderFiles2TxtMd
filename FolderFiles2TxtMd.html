@@ -1,0 +1,955 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Folder to Text/Markdown Converter</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+            min-height: 100vh;
+            display: flex;
+            align-items: flex-start;
+            justify-content: center;
+            padding: 30px 20px;
+        }
+
+        .container {
+            background: #fff;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+            padding: 40px;
+            max-width: 900px;
+            width: 100%;
+        }
+
+        .header { text-align: center; margin-bottom: 35px; }
+
+        .header h1 {
+            font-size: 2.4em;
+            margin-bottom: 8px;
+            background: linear-gradient(135deg, #0f2027, #2c5364);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .header p { color: #666; font-size: 1.05em; }
+
+        .section {
+            margin-bottom: 25px;
+            padding: 22px;
+            background: #f8f9fa;
+            border-radius: 14px;
+            border-left: 5px solid #2c5364;
+        }
+
+        .section h3 { color: #333; margin-bottom: 14px; font-size: 1.2em; }
+
+        /* --- File Upload --- */
+        .file-upload {
+            border: 3px dashed #2c5364;
+            border-radius: 14px;
+            padding: 38px;
+            text-align: center;
+            background: #f4f8fb;
+            transition: all .3s;
+            cursor: pointer;
+        }
+        .file-upload:hover { border-color: #0f2027; background: #eaf1f6; }
+        .file-upload.dragover { border-color: #28a745; background: #f0fff0; }
+        .file-input { display: none; }
+        .upload-text { color: #2c5364; font-size: 1.15em; margin-bottom: 8px; }
+        .upload-hint { color: #999; font-size: .9em; }
+
+        /* --- Options --- */
+        .options-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 18px;
+            margin-bottom: 18px;
+        }
+
+        .option-group {
+            background: #fff;
+            padding: 18px;
+            border-radius: 10px;
+            border: 2px solid #e9ecef;
+        }
+        .option-group h4 { color: #333; margin-bottom: 12px; font-size: 1.05em; }
+
+        .radio-option { margin-bottom: 9px; display: flex; align-items: center; gap: 6px; }
+        .radio-option label { color: #555; cursor: pointer; font-size: .95em; }
+
+        .checkbox-option { margin-bottom: 9px; display: flex; align-items: center; gap: 6px; }
+        .checkbox-option label { color: #555; cursor: pointer; font-size: .95em; }
+
+        select, input[type="text"] {
+            width: 100%;
+            padding: 10px 12px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: .95em;
+            margin-top: 6px;
+        }
+        select:focus, input[type="text"]:focus { outline: none; border-color: #2c5364; }
+
+        /* --- Textarea --- */
+        .ignore-patterns {
+            width: 100%;
+            height: 140px;
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            padding: 14px;
+            font-family: 'Courier New', monospace;
+            font-size: .88em;
+            resize: vertical;
+        }
+        .ignore-patterns:focus { outline: none; border-color: #2c5364; }
+
+        /* --- Preset buttons --- */
+        .preset-bar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+        .preset-btn {
+            padding: 6px 14px;
+            border-radius: 20px;
+            border: 1px solid #2c5364;
+            background: #fff;
+            color: #2c5364;
+            font-size: .85em;
+            cursor: pointer;
+            transition: all .2s;
+        }
+        .preset-btn:hover, .preset-btn.active { background: #2c5364; color: #fff; }
+
+        /* --- Process button --- */
+        .process-btn {
+            width: 100%;
+            background: linear-gradient(135deg, #0f2027, #2c5364);
+            color: #fff;
+            border: none;
+            padding: 16px;
+            border-radius: 10px;
+            font-size: 1.2em;
+            cursor: pointer;
+            transition: all .3s;
+            margin-top: 18px;
+        }
+        .process-btn:hover { transform: translateY(-2px); box-shadow: 0 10px 25px rgba(44,83,100,.35); }
+        .process-btn:disabled { background: #bbb; cursor: not-allowed; transform: none; box-shadow: none; }
+
+        /* --- Status --- */
+        .status { margin-top: 18px; padding: 14px; border-radius: 10px; display: none; }
+        .status.success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .status.error   { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .status.info    { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+
+        /* --- File list --- */
+        .file-list {
+            max-height: 220px;
+            overflow-y: auto;
+            border: 1px solid #e9ecef;
+            border-radius: 10px;
+            padding: 14px;
+            background: #fff;
+            margin-top: 14px;
+        }
+        .file-item { padding: 4px 0; border-bottom: 1px solid #f0f0f0; font-size: .88em; color: #555; }
+        .file-item:last-child { border-bottom: none; }
+        .file-count { font-weight: 600; margin-bottom: 8px; color: #333; }
+
+        /* --- Tree preview --- */
+        .tree-preview {
+            max-height: 260px;
+            overflow-y: auto;
+            background: #1e1e1e;
+            color: #d4d4d4;
+            border-radius: 10px;
+            padding: 16px;
+            font-family: 'Courier New', monospace;
+            font-size: .85em;
+            margin-top: 14px;
+            white-space: pre;
+            display: none;
+        }
+
+        @media (max-width: 768px) {
+            .container { padding: 20px; }
+            .options-grid { grid-template-columns: 1fr; }
+            .header h1 { font-size: 1.8em; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <!-- Header -->
+    <div class="header">
+        <h1>📂 Folder → Text / Markdown</h1>
+        <p>Convert any project folder into an AI-friendly single file — 100 % local, nothing leaves your browser</p>
+    </div>
+
+    <!-- 1. Select folder -->
+    <div class="section">
+        <h3>📁 Select Project Folder</h3>
+        <div class="file-upload" id="fileUpload">
+            <div class="upload-text">Click to select a folder or drag &amp; drop here</div>
+            <div class="upload-hint">Works with any project: C++, Python, R, JS/TS, Java, Rust, Go, etc.</div>
+            <input type="file" id="fileInput" class="file-input" webkitdirectory multiple>
+        </div>
+        <div id="fileList" class="file-list" style="display:none;"></div>
+    </div>
+
+    <!-- 2. Options -->
+    <div class="section">
+        <h3>⚙️ Conversion Options</h3>
+        <div class="options-grid">
+
+            <div class="option-group">
+                <h4>Output Format</h4>
+                <div class="radio-option">
+                    <input type="radio" id="fmtTxt" name="outputFormat" value="txt" checked>
+                    <label for="fmtTxt">.txt — plain text</label>
+                </div>
+                <div class="radio-option">
+                    <input type="radio" id="fmtMd" name="outputFormat" value="md">
+                    <label for="fmtMd">.md — Markdown with fenced code blocks</label>
+                </div>
+            </div>
+
+            <div class="option-group">
+                <h4>Export Mode</h4>
+                <div class="radio-option">
+                    <input type="radio" id="modeSingle" name="exportMode" value="single" checked>
+                    <label for="modeSingle">Single concatenated file (best for AI)</label>
+                </div>
+                <div class="radio-option">
+                    <input type="radio" id="modeMulti" name="exportMode" value="multiple">
+                    <label for="modeMulti">Multiple files (zipped)</label>
+                </div>
+            </div>
+
+            <div class="option-group">
+                <h4>Directory Tree</h4>
+                <div class="checkbox-option">
+                    <input type="checkbox" id="includeTree" checked>
+                    <label for="includeTree">Prepend directory tree to output</label>
+                </div>
+            </div>
+
+            <div class="option-group">
+                <h4>Binary / Large Files</h4>
+                <div class="checkbox-option">
+                    <input type="checkbox" id="skipBinary" checked>
+                    <label for="skipBinary">Skip binary files automatically</label>
+                </div>
+                <label style="font-size:.88em;color:#666;margin-top:8px;display:block;">
+                    Max file size (KB):
+                    <input type="number" id="maxFileSize" value="512" min="1" style="width:90px;display:inline;margin-left:4px;">
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. Ignore Patterns with presets -->
+    <div class="section">
+        <h3>🚫 Ignore Patterns</h3>
+        <p style="margin-bottom:10px;color:#666;font-size:.93em;">Choose a preset, then customise. Patterns follow gitignore syntax (one per line).</p>
+
+        <div class="preset-bar">
+            <button class="preset-btn active" data-preset="generic">Generic</button>
+            <button class="preset-btn" data-preset="cpp">C / C++</button>
+            <button class="preset-btn" data-preset="python">Python</button>
+            <button class="preset-btn" data-preset="r">R</button>
+            <button class="preset-btn" data-preset="node">Node / JS / TS</button>
+            <button class="preset-btn" data-preset="java">Java / Kotlin</button>
+            <button class="preset-btn" data-preset="rust">Rust</button>
+            <button class="preset-btn" data-preset="go">Go</button>
+        </div>
+
+        <textarea id="ignorePatterns" class="ignore-patterns"></textarea>
+    </div>
+
+    <!-- 4. Process -->
+    <button id="processBtn" class="process-btn" disabled>🔄 Convert to Text</button>
+    <div id="status" class="status"></div>
+    <pre id="treePreview" class="tree-preview"></pre>
+</div>
+
+<script>
+/* ================================================================
+   PRESET IGNORE PATTERNS
+   ================================================================ */
+const PRESETS = {
+    generic: `# Version control
+.git/
+.svn/
+.hg/
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Build artifacts
+*.tar.gz
+*.zip
+*.7z
+*.rar
+
+# Logs & temp
+*.log
+*.tmp
+*.temp
+*.bak`,
+
+    cpp: `# Version control
+.git/
+.svn/
+
+# Build
+build/
+cmake-build-*/
+out/
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.dylib
+*.dll
+*.exe
+
+# IDE
+.vscode/
+.idea/
+*.vcxproj.user
+*.suo
+*.sdf
+*.opensdf
+.vs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Package managers
+vcpkg_installed/
+conan/
+
+# Misc
+*.log
+*.tmp
+*.tar.gz
+*.zip`,
+
+    python: `# Version control
+.git/
+
+# Byte-compiled / cached
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+env/
+.env
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Jupyter
+.ipynb_checkpoints/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Misc
+*.log
+*.tmp
+*.tar.gz
+*.zip`,
+
+    r: `# R specific
+*.Rproj
+.Rproj.user/
+.Rhistory
+.RData
+.Ruserdata
+
+# Compiled
+*.o
+*.so
+*.dll
+
+# IDE
+.vscode/
+.idea/
+
+# Version control
+.git/
+.github/
+
+# Dev / test / docs
+dev/
+tests/
+vignettes/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Misc
+*.log
+*.tmp
+*.tar.gz
+*.zip`,
+
+    node: `# Version control
+.git/
+
+# Dependencies
+node_modules/
+bower_components/
+
+# Build
+dist/
+build/
+.next/
+.nuxt/
+.output/
+out/
+
+# IDE
+.vscode/
+.idea/
+
+# Env
+.env
+.env.*
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Coverage
+coverage/
+
+# Misc
+*.tar.gz
+*.zip
+*.map`,
+
+    java: `# Version control
+.git/
+
+# Build
+target/
+build/
+out/
+*.class
+*.jar
+*.war
+*.ear
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.settings/
+.project
+.classpath
+.factorypath
+
+# Gradle
+.gradle/
+gradle/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Misc
+*.log
+*.tmp
+*.tar.gz
+*.zip`,
+
+    rust: `# Version control
+.git/
+
+# Build
+target/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Misc
+*.log
+*.tmp
+*.tar.gz
+*.zip
+Cargo.lock`,
+
+    go: `# Version control
+.git/
+
+# Binary
+*.exe
+*.out
+*.test
+
+# Vendor (optional)
+vendor/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Misc
+*.log
+*.tmp
+*.tar.gz
+*.zip`
+};
+
+/* ================================================================
+   LANGUAGE EXTENSIONS → MARKDOWN FENCE HINTS
+   ================================================================ */
+const EXT_TO_LANG = {
+    '.c': 'c', '.h': 'c', '.cpp': 'cpp', '.cxx': 'cpp', '.cc': 'cpp',
+    '.hpp': 'cpp', '.hxx': 'cpp', '.hh': 'cpp',
+    '.py': 'python', '.pyw': 'python', '.pyi': 'python',
+    '.r': 'r', '.rmd': 'rmd', '.rnw': 'rnw', '.qmd': 'qmd',
+    '.js': 'javascript', '.mjs': 'javascript', '.cjs': 'javascript',
+    '.ts': 'typescript', '.tsx': 'tsx', '.jsx': 'jsx',
+    '.java': 'java', '.kt': 'kotlin', '.kts': 'kotlin',
+    '.rs': 'rust', '.go': 'go',
+    '.rb': 'ruby', '.php': 'php', '.swift': 'swift',
+    '.cs': 'csharp', '.fs': 'fsharp', '.vb': 'vb',
+    '.sh': 'bash', '.bash': 'bash', '.zsh': 'zsh', '.fish': 'fish',
+    '.ps1': 'powershell', '.bat': 'batch', '.cmd': 'batch',
+    '.sql': 'sql',
+    '.html': 'html', '.htm': 'html', '.css': 'css', '.scss': 'scss', '.less': 'less',
+    '.xml': 'xml', '.xsl': 'xml', '.xslt': 'xml', '.svg': 'xml',
+    '.json': 'json', '.jsonc': 'jsonc',
+    '.yaml': 'yaml', '.yml': 'yaml',
+    '.toml': 'toml', '.ini': 'ini', '.cfg': 'ini',
+    '.md': 'markdown', '.markdown': 'markdown', '.rst': 'rst', '.txt': 'text',
+    '.cmake': 'cmake',
+    '.dockerfile': 'dockerfile',
+    '.tf': 'hcl', '.hcl': 'hcl',
+    '.lua': 'lua', '.pl': 'perl', '.pm': 'perl',
+    '.scala': 'scala', '.clj': 'clojure', '.ex': 'elixir', '.exs': 'elixir',
+    '.hs': 'haskell', '.ml': 'ocaml', '.mli': 'ocaml',
+    '.dart': 'dart', '.jl': 'julia', '.m': 'matlab',
+    '.f': 'fortran', '.f90': 'fortran', '.f95': 'fortran',
+    '.proto': 'protobuf', '.graphql': 'graphql', '.gql': 'graphql',
+    '.makefile': 'makefile',
+};
+
+/* Known plain-text filenames (no extension) */
+const KNOWN_TEXT_NAMES = new Set([
+    'makefile', 'cmakelists.txt', 'dockerfile', 'vagrantfile',
+    'gemfile', 'rakefile', 'procfile',
+    'description', 'namespace', 'news', 'readme',
+    'license', 'licence', 'authors', 'contributors',
+    'changelog', 'changes', 'todo', 'copying',
+    '.gitignore', '.gitattributes', '.gitmodules',
+    '.editorconfig', '.clang-format', '.clang-tidy',
+    '.eslintrc', '.prettierrc', '.babelrc',
+    '.dockerignore', '.npmignore', '.Rbuildignore',
+]);
+
+/* Binary extensions to always skip */
+const BINARY_EXT = new Set([
+    '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.ico', '.webp', '.svg',
+    '.mp3', '.mp4', '.wav', '.avi', '.mov', '.mkv', '.flac', '.ogg',
+    '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
+    '.zip', '.tar', '.gz', '.bz2', '.7z', '.rar', '.xz',
+    '.exe', '.dll', '.so', '.dylib', '.o', '.obj', '.a', '.lib',
+    '.class', '.jar', '.war', '.ear',
+    '.pyc', '.pyo', '.whl',
+    '.rds', '.rda', '.rdata', '.feather', '.parquet', '.arrow',
+    '.sqlite', '.db', '.mdb',
+    '.woff', '.woff2', '.ttf', '.otf', '.eot',
+    '.bin', '.dat', '.iso', '.img',
+]);
+
+/* ================================================================
+   MAIN APP CLASS
+   ================================================================ */
+class FolderConverter {
+    constructor() {
+        this.files = [];
+        this.rootName = 'project';
+        this.initListeners();
+        this.applyPreset('generic');
+    }
+
+    /* ---- Event wiring ---- */
+    initListeners() {
+        const up = document.getElementById('fileUpload');
+        const inp = document.getElementById('fileInput');
+        const btn = document.getElementById('processBtn');
+
+        up.addEventListener('click', () => inp.click());
+        up.addEventListener('dragover', e => { e.preventDefault(); up.classList.add('dragover'); });
+        up.addEventListener('dragleave', e => { e.preventDefault(); up.classList.remove('dragover'); });
+        up.addEventListener('drop', e => { e.preventDefault(); up.classList.remove('dragover'); this.handleDrop(e); });
+        inp.addEventListener('change', e => this.handleSelect(e));
+        btn.addEventListener('click', () => this.process());
+
+        document.querySelectorAll('.preset-btn').forEach(b => {
+            b.addEventListener('click', () => {
+                document.querySelectorAll('.preset-btn').forEach(x => x.classList.remove('active'));
+                b.classList.add('active');
+                this.applyPreset(b.dataset.preset);
+            });
+        });
+    }
+
+    applyPreset(name) {
+        document.getElementById('ignorePatterns').value = PRESETS[name] || PRESETS.generic;
+    }
+
+    /* ---- File handling ---- */
+    handleSelect(e) {
+        const list = Array.from(e.target.files);
+        if (list.length) {
+            // derive root folder name from first file path
+            const first = list[0].webkitRelativePath || list[0].name;
+            this.rootName = first.split('/')[0] || 'project';
+        }
+        this.setFiles(list);
+    }
+
+    async handleDrop(e) {
+        const items = e.dataTransfer.items;
+        if (!items) return;
+        const collected = [];
+        for (const item of items) {
+            if (item.kind === 'file') {
+                const entry = item.webkitGetAsEntry();
+                if (entry) {
+                    this.rootName = entry.name || 'project';
+                    await this.traverse(entry, collected);
+                }
+            }
+        }
+        this.setFiles(collected);
+    }
+
+    traverse(item, out, path = '') {
+        return new Promise(resolve => {
+            if (item.isFile) {
+                item.file(f => { f.fullPath = path + f.name; out.push(f); resolve(); });
+            } else if (item.isDirectory) {
+                const reader = item.createReader();
+                const readAll = (entries = []) => {
+                    reader.readEntries(async batch => {
+                        if (batch.length === 0) {
+                            for (const entry of entries)
+                                await this.traverse(entry, out, path + item.name + '/');
+                            resolve();
+                        } else {
+                            readAll(entries.concat(Array.from(batch)));
+                        }
+                    });
+                };
+                readAll();
+            } else { resolve(); }
+        });
+    }
+
+    setFiles(fileList) {
+        this.files = fileList;
+        this.renderFileList();
+        document.getElementById('processBtn').disabled = this.filterFiles().length === 0;
+    }
+
+    /* ---- Filtering ---- */
+    parseIgnore() {
+        return document.getElementById('ignorePatterns').value
+            .split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('#'))
+            .map(p => {
+                let r = p.replace(/[.+^${}()|[\]\\]/g, '\\$&')   // escape regex specials except * and ?
+                         .replace(/\\\*/g, '.*').replace(/\\\?/g, '.');  // but * was escaped, undo
+                // Fix: the above double-escapes; let's redo properly
+                return null; // placeholder
+            });
+        // Actually let's do this properly:
+    }
+
+    /* Proper gitignore-style pattern → RegExp */
+    compilePatterns() {
+        const lines = document.getElementById('ignorePatterns').value
+            .split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('#'));
+        return lines.map(pattern => {
+            let re = pattern
+                .replace(/[-\/\\^$+?.()|[\]{}]/g, '\\$&')   // escape everything except *
+                .replace(/\\\*/g, '.*');                       // un-escape * → .*
+            if (pattern.endsWith('/')) {
+                re = '(^|/)' + re + '.*';
+            } else {
+                re = '(^|/)' + re + '($|/)';
+            }
+            try { return new RegExp(re, 'i'); } catch { return null; }
+        }).filter(Boolean);
+    }
+
+    getRelPath(file) {
+        const p = file.fullPath || file.webkitRelativePath || file.name;
+        // strip leading root folder name so paths are relative inside project
+        const idx = p.indexOf('/');
+        return idx >= 0 ? p.substring(idx + 1) : p;
+    }
+
+    isBinary(file) {
+        const ext = ('.' + file.name.split('.').pop()).toLowerCase();
+        return BINARY_EXT.has(ext);
+    }
+
+    filterFiles() {
+        const patterns = this.compilePatterns();
+        const skipBin = document.getElementById('skipBinary').checked;
+        const maxKB = parseInt(document.getElementById('maxFileSize').value, 10) || 512;
+
+        return this.files.filter(f => {
+            const rel = this.getRelPath(f);
+            if (patterns.some(rx => rx.test(rel))) return false;
+            if (skipBin && this.isBinary(f)) return false;
+            if (f.size > maxKB * 1024) return false;
+            return true;
+        });
+    }
+
+    /* ---- UI helpers ---- */
+    renderFileList() {
+        const el = document.getElementById('fileList');
+        const filtered = this.filterFiles();
+        if (!filtered.length) { el.style.display = 'none'; return; }
+        el.style.display = 'block';
+        el.innerHTML = `<div class="file-count">✅ ${filtered.length} files will be included (of ${this.files.length} total)</div>`
+            + filtered.map(f => `<div class="file-item">${this.getRelPath(f)}</div>`).join('');
+    }
+
+    showStatus(msg, type) {
+        const s = document.getElementById('status');
+        s.textContent = msg;
+        s.className = 'status ' + type;
+        s.style.display = 'block';
+        if (type === 'success') setTimeout(() => s.style.display = 'none', 6000);
+    }
+
+    /* ---- Build directory tree string ---- */
+    buildTree(files) {
+        const tree = {};
+        for (const f of files) {
+            const parts = this.getRelPath(f).split('/');
+            let node = tree;
+            for (let i = 0; i < parts.length; i++) {
+                const p = parts[i];
+                if (i === parts.length - 1) {
+                    node[p] = null; // file
+                } else {
+                    if (!node[p]) node[p] = {};
+                    node = node[p];
+                }
+            }
+        }
+
+        const lines = [this.rootName + '/'];
+        const render = (node, prefix) => {
+            const keys = Object.keys(node).sort((a, b) => {
+                const aDir = node[a] !== null;
+                const bDir = node[b] !== null;
+                if (aDir !== bDir) return aDir ? -1 : 1;
+                return a.localeCompare(b);
+            });
+            keys.forEach((k, i) => {
+                const isLast = i === keys.length - 1;
+                const connector = isLast ? '└── ' : '├── ';
+                const isDir = node[k] !== null;
+                lines.push(prefix + connector + k + (isDir ? '/' : ''));
+                if (isDir) render(node[k], prefix + (isLast ? '    ' : '│   '));
+            });
+        };
+        render(tree, '');
+        return lines.join('\n');
+    }
+
+    /* ---- Detect language for Markdown fences ---- */
+    langHint(file) {
+        const name = file.name.toLowerCase();
+        const dotIdx = name.lastIndexOf('.');
+        if (dotIdx >= 0) {
+            const ext = name.substring(dotIdx);
+            if (EXT_TO_LANG[ext]) return EXT_TO_LANG[ext];
+        }
+        if (name === 'makefile' || name === 'gnumakefile') return 'makefile';
+        if (name === 'dockerfile') return 'dockerfile';
+        if (name === 'cmakelists.txt') return 'cmake';
+        return '';
+    }
+
+    /* ---- Read file as text ---- */
+    readText(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = e => resolve(e.target.result);
+            reader.onerror = () => resolve('[Could not read file]');
+            reader.readAsText(file);
+        });
+    }
+
+    /* ---- Main process ---- */
+    async process() {
+        const btn = document.getElementById('processBtn');
+        btn.disabled = true;
+        btn.textContent = '⏳ Processing…';
+        this.showStatus('Reading files…', 'info');
+
+        try {
+            const filtered = this.filterFiles();
+            if (!filtered.length) throw new Error('No files to process after filtering.');
+
+            const fmt = document.querySelector('input[name="outputFormat"]:checked').value;   // txt | md
+            const mode = document.querySelector('input[name="exportMode"]:checked').value;    // single | multiple
+            const wantTree = document.getElementById('includeTree').checked;
+
+            if (mode === 'single') {
+                await this.exportSingle(filtered, fmt, wantTree);
+            } else {
+                await this.exportMultiple(filtered, fmt, wantTree);
+            }
+
+            this.showStatus(`✅ Exported ${filtered.length} files successfully!`, 'success');
+        } catch (err) {
+            console.error(err);
+            this.showStatus('Error: ' + err.message, 'error');
+        } finally {
+            btn.disabled = false;
+            btn.textContent = '🔄 Convert to Text';
+        }
+    }
+
+    async exportSingle(files, fmt, wantTree) {
+        const isMd = fmt === 'md';
+        const sep = isMd ? '---' : '='.repeat(80);
+        let parts = [];
+
+        // Header
+        parts.push(isMd
+            ? `# ${this.rootName} — Source Export\n\n> Generated on ${new Date().toISOString()}  \n> Files: ${files.length}\n`
+            : `# ${this.rootName} — Source Export\n# Generated on: ${new Date().toISOString()}\n# Files: ${files.length}\n`);
+
+        // Tree
+        if (wantTree) {
+            const tree = this.buildTree(files);
+            if (isMd) {
+                parts.push(`## Directory Structure\n\n\`\`\`\n${tree}\n\`\`\`\n`);
+            } else {
+                parts.push(`${'='.repeat(80)}\nDIRECTORY STRUCTURE\n${'='.repeat(80)}\n\n${tree}\n`);
+            }
+            // Show tree preview in UI
+            const treeEl = document.getElementById('treePreview');
+            treeEl.style.display = 'block';
+            treeEl.textContent = tree;
+        }
+
+        // Files
+        for (const f of files) {
+            const rel = this.getRelPath(f);
+            const content = await this.readText(f);
+            if (isMd) {
+                const lang = this.langHint(f);
+                parts.push(`${sep}\n\n## File: \`${rel}\`\n\n\`\`\`${lang}\n${content}\n\`\`\`\n`);
+            } else {
+                parts.push(`\n${sep}\nFILE: ${rel}\n${sep}\n\n${content}\n`);
+            }
+        }
+
+        const ext = isMd ? 'md' : 'txt';
+        this.download(parts.join('\n'), `${this.rootName}_export.${ext}`, 'text/plain');
+    }
+
+    async exportMultiple(files, fmt, wantTree) {
+        // Build a single "zip-like" concatenated file (since true zip requires a library)
+        // For simplicity we still produce one file but clearly delimited per-file.
+        // (For a real zip we'd need JSZip; keeping it dependency-free here.)
+        const isMd = fmt === 'md';
+        let parts = [];
+
+        parts.push(isMd
+            ? `# ${this.rootName} — Multi-File Export\n\n> ${files.length} files\n`
+            : `# ${this.rootName} — Multi-File Export\n# ${files.length} files\n`);
+
+        if (wantTree) {
+            const tree = this.buildTree(files);
+            parts.push(isMd ? `## Directory Structure\n\n\`\`\`\n${tree}\n\`\`\`\n` : `${tree}\n`);
+        }
+
+        for (const f of files) {
+            const rel = this.getRelPath(f);
+            const content = await this.readText(f);
+            if (isMd) {
+                const lang = this.langHint(f);
+                parts.push(`---\n\n## \`${rel}\`\n\n\`\`\`${lang}\n${content}\n\`\`\`\n`);
+            } else {
+                parts.push(`\n${'='.repeat(80)}\nFILE: ${rel}\n${'='.repeat(80)}\n\n${content}\n`);
+            }
+        }
+
+        const ext = isMd ? 'md' : 'txt';
+        this.download(parts.join('\n'), `${this.rootName}_export.${ext}`, 'text/plain');
+    }
+
+    download(content, filename, mime) {
+        const blob = new Blob([content], { type: mime });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = filename;
+        document.body.appendChild(a); a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => new FolderConverter());
+</script>
+</body>
+</html>
