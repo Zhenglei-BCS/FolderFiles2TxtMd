@@ -30,3 +30,12 @@ The tool reads every file in the selected folder via the browser's File System A
 ## Customising Ignore Patterns
 
 The textarea accepts standard gitignore-style patterns (one per line). Lines starting with `#` are treated as comments. Click a preset button to load a starting set, then add or remove patterns as needed.
+
+## Contributors
+
+<!-- ALL-CONTRIBUTORS-LIST:START -->
+| Avatar | Name | Role |
+|---|---|---|
+| <img src="https://github.com/Zhenglei-BCS.png" width="50"> | [@Zhenglei-BCS](https://github.com/Zhenglei-BCS) | Creator & maintainer |
+| <img src="https://github.com/copilot.png" width="50"> | [@copilot](https://github.com/copilot) | AI pair programmer 🤖 |
+<!-- ALL-CONTRIBUTORS-LIST:END -->
